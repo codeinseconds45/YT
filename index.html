@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MediaForge — Local Audio & Video Converter</title>
+<style>
+  :root{
+    --bg:#0b0d12;
+    --panel:#12151d;
+    --panel-2:#171b25;
+    --border:#232838;
+    --text:#e8ecf4;
+    --muted:#8b94a8;
+    --accent:#7c5cff;
+    --accent-2:#22d3ee;
+    --ok:#34d399;
+    --err:#f87171;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+    background:var(--bg);
+    color:var(--text);
+    min-height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:24px 16px;
+    background-image:
+      radial-gradient(circle at 15% 0%, rgba(124,92,255,.18), transparent 45%),
+      radial-gradient(circle at 85% 100%, rgba(34,211,238,.14), transparent 45%);
+    background-attachment:fixed;
+  }
+  .app{width:100%;max-width:720px}
+  header{text-align:center;margin-bottom:28px}
+  .logo{
+    display:inline-flex;align-items:center;gap:10px;
+    font-size:26px;font-weight:800;letter-spacing:-.5px;
+  }
+  .logo .mark{
+    width:36px;height:36px;border-radius:10px;
+    background:linear-gradient(135deg,var(--accent),var(--accent-2));
+    display:grid;place-items:center;font-size:18px;
+  }
+  .grad{
+    background:linear-gradient(135deg,var(--accent),var(--accent-2));
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+  }
+  header p{color:var(--muted);font-size:14px;margin-top:8px}
+
+  .card{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:18px;
+    padding:22px;
+    box-shadow:0 20px 50px rgba(0,0,0,.45);
+  }
+
+  /* Drop zone */
+  #drop{
+    border:2px dashed var(--border);
+    border-radius:14px;
+    padding:38px 20px;
+    text-align:center;
+    cursor:pointer;
+    transition:.2s;
+    background:var(--panel-2);
+  }
+  #drop:hover{border-color:var(--accent);background:#1a1f2e}
+  #drop.drag{border-color:var(--accent-2);background:#16202b;transform:scale(1.01)}
+  #drop .icon{font-size:36px;margin-bottom:10px;opacity:.9}
+  #drop .title{font-weight:600;font-size:15px}
+  #drop .sub{color:var(--muted);font-size:13px;margin-top:6px}
+  #fileInput{display:none}
+
+  /* File info */
+  #fileInfo{
+    display:none;align-items:center;gap:12px;
+    background:var(--panel-2);border:1px solid var(--border);
+    border-radius:12px;padding:12px 14px;margin-top:14px;
+  }
+  #fileInfo.show{display:flex}
+  #fileInfo .fi-icon{font-size:22px}
+  #fileInfo .fi-meta{flex:1;min-width:0}
+  #fileInfo .fi-name{
+    font-size:14px;font-weight:600;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+  #fileInfo .fi-size{font-size:12px;color:var(--muted);margin-top:2px}
+  #clearBtn{
+    background:none;border:1px solid var(--border);color:var(--muted);
+    width:28px;height:28px;border-radius:8px;cursor:pointer;font-size:14px;
+    transition:.15s;flex-shrink:0;
+  }
+  #clearBtn:hover{color:var(--err);border-color:var(--err)}
+
+  /* Options */
+  #options{display:none;margin-top:20px}
+  #options.show{display:block}
+  .field{margin-bottom:16px}
+  .field label{
+    display:block;font-size:12px;font-weight:600;color:var(--muted);
+    text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px;
+  }
+  .seg{display:flex;gap:8px}
+  .seg button{
+    flex:1;padding:11px 8px;border-radius:10px;cursor:pointer;
+    background:var(--panel-2);border:1px solid var(--border);
+    color:var(--muted);font-size:14px;font-weight:600;font-family:inherit;
+    transition:.15s;
+  }
+  .seg button:hover{color:var(--text);border-color:#2e3549}
+  .seg button.active{
+    background:linear-gradient(135deg,rgba(124,92,255,.22),rgba(34,211,238,.18));
+    border-color:var(--accent);color:var(--text);
+  }
+  select{
+    width:100%;padding:11px 12px;border-radius:10px;font-family:inherit;
+    background:var(--panel-2);border:1px solid var(--border);color:var(--text);
+    font-size:14px;cursor:pointer;outline:none;
+  }
+  select:focus{border-color:var(--accent)}
+  option{background:#12151d}
+
+  /* Convert button */
+  #convertBtn{
+    width:100%;padding:14px;border:none;border-radius:12px;cursor:pointer;
+    font-family:inherit;font-size:15px;font-weight:700;color:#fff;
+    background:linear-gradient(135deg,var(--accent),var(--accent-2));
+    transition:.2s;margin-top:4px;
+  }
+  #convertBtn:hover:not(:disabled){filter:brightness(1.12);transform:translateY(-1px)}
+  #convertBtn:disabled{opacity:.5;cursor:not-allowed;transform:none}
+
+  /* Progress */
+  #progressWrap{display:none;margin-top:18px}
+  #progressWrap.show{display:block}
+  .pbar{
+    height:8px;background:var(--panel-2);border-radius:99px;overflow:hidden;
+    border:1px solid var(--border);
+  }
+  .pbar-fill{
+    height:100%;width:0%;border-radius:99px;
+    background:linear-gradient(90deg,var(--accent),var(--accent-2));
+    transition:width .25s ease;
+  }
+  .pbar-fill.indeterminate{
+    width:35%!important;
+    animation:slide 1.2s ease-in-out infinite;
+  }
+  @keyframes slide{
+    0%{margin-left:-35%}100%{margin-left:100%}
+  }
+  #statusText{
+    font-size:13px;color:var(--muted);margin-top:10px;text-align:center;
+  }
+
+  /* Result */
+  #result{display:none;margin-top:18px}
+  #result.show{display:block}
+  .result-box{
+    background:linear-gradient(135deg,rgba(52,211,153,.1),rgba(34,211,238,.06));
+    border:1px solid rgba(52,211,153,.35);
+    border-radius:12px;padding:16px;text-align:center;
+  }
+  .result-box .r-title{font-weight:700;color:var(--ok);font-size:15px}
+  .result-box .r-sub{font-size:13px;color:var(--muted);margin-top:4px}
+  #downloadBtn{
+    display:inline-block;margin-top:14px;padding:11px 26px;border-radius:10px;
+    background:var(--ok);color:#052e21;font-weight:700;font-size:14px;
+    text-decoration:none;transition:.2s;border:none;cursor:pointer;font-family:inherit;
+  }
+  #downloadBtn:hover{filter:brightness(1.1);transform:translateY(-1px)}
+
+  /* Log */
+  #logToggle{
+    background:none;border:none;color:var(--muted);font-size:12px;
+    cursor:pointer;margin-top:14px;font-family:inherit;padding:4px;
+    display:none;
+  }
+  #logToggle.show{display:block}
+  #logToggle:hover{color:var(--text)}
+  #log{
+    display:none;margin-top:10px;background:#07090d;border:1px solid var(--border);
+    border-radius:10px;padding:10px;max-height:170px;overflow-y:auto;
+    font-family:ui-monospace,'SF Mono',Menlo,monospace;font-size:11px;
+    color:#7d8799;line-height:1.6;white-space:pre-wrap;word-break:break-all;
+  }
+  #log.show{display:block}
+
+  footer{
+    text-align:center;margin-top:20px;font-size:12px;color:var(--muted);
+    line-height:1.7;
+  }
+  footer b{color:#a8b1c4;font-weight:600}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header>
+    <div class="logo">
+      <span class="mark">⚡</span>
+      <span>Media<span class="grad">Forge</span></span>
+    </div>
+    <p>Convert video to MP3 or compressed MP4 — 100% in your browser</p>
+  </header>
+
+  <div class="card">
+
+    <!-- Drop zone -->
+    <div id="drop">
+      <div class="icon">📁</div>
+      <div class="title">Drop a video or audio file here</div>
+      <div class="sub">or click to browse — MP4, MOV, MKV, WebM, AVI, M4A, WAV, FLAC</div>
+    </div>
+    <input type="file" id="fileInput" accept="video/*,audio/*">
+
+    <!-- File info -->
+    <div id="fileInfo">
+      <div class="fi-icon" id="fiIcon">🎬</div>
+      <div class="fi-meta">
+        <div class="fi-name" id="fiName">—</div>
+        <div class="fi-size" id="fiSize">—</div>
+      </div>
+      <button id="clearBtn" title="Remove">✕</button>
+    </div>
+
+    <!-- Options -->
+    <div id="options">
+
+      <div class="field">
+        <label>Output format</label>
+        <div class="seg" id="formatSeg">
+          <button data-fmt="mp3" class="active">🎵 MP3 (audio)</button>
+          <button data-fmt="mp4">🎬 MP4 (video)</button>
+        </div>
+      </div>
+
+      <div class="field" id="mp3Opts">
+        <label>Audio bitrate</label>
+        <select id="bitrate">
+          <option value="128k">128 kbps — small file</option>
+          <option value="192k" selected>192 kbps — balanced</option>
+          <option value="256k">256 kbps — high</option>
+          <option value="320k">320 kbps — max quality</option>
+        </select>
+      </div>
+
+      <div class="field" id="mp4Opts" style="display:none">
+        <label>Video quality</label>
+        <select id="crf">
+          <option value="20">High — CRF 20 (bigger file)</option>
+          <option value="26" selected>Balanced — CRF 26</option>
+          <option value="32">Small — CRF 32 (lower quality)</option>
+        </select>
+      </div>
+
+      <div class="field" id="scaleField" style="display:none">
+        <label>Resolution</label>
+        <select id="scale">
+          <option value="">Keep original</option>
+          <option value="1080">1080p</option>
+          <option value="720">720p</option>
+          <option value="480">480p</option>
+        </select>
+      </div>
+
+      <button id="convertBtn">Convert</button>
+    </div>
+
+    <!-- Progress -->
+    <div id="progressWrap">
+      <div class="pbar"><div class="pbar-fill" id="pbarFill"></div></div>
+      <div id="statusText">Ready</div>
+    </div>
+
+    <!-- Result -->
+    <div id="result">
+      <div class="result-box">
+        <div class="r-title">✓ Conversion complete</div>
+        <div class="r-sub" id="resultSub">—</div>
+        <button id="downloadBtn">⬇ Download</button>
+      </div>
+    </div>
+
+    <button id="logToggle">▸ Show engine log</button>
+    <div id="log"></div>
+
+  </div>
+
+  <footer>
+    Everything runs locally via WebAssembly — <b>your files never leave your device.</b><br>
+    First run downloads the ~30 MB FFmpeg engine (cached afterward).
+  </footer>
+
+</div>
+
+<script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js"></script>
+<script src="https://unpkg.com/@ffmpeg/util@0.12.1/dist/umd/util.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  const { FFmpeg } = FFmpegWASM;
+  const { fetchFile, toBlobURL } = FFmpegUtil;
+
+  const CORE_VERSION = "0.12.6";
+  const CORE_BASE = `https://unpkg.com/@ffmpeg/core@${CORE_VERSION}/dist/umd`;
+
+  // ---- DOM ----
+  const $ = (id) => document.getElementById(id);
+  const drop = $("drop"), fileInput = $("fileInput");
+  const fileInfo = $("fileInfo"), fiName = $("fiName"), fiSize = $("fiSize"), fiIcon = $("fiIcon");
+  const clearBtn = $("clearBtn");
+  const options = $("options");
+  const formatSeg = $("formatSeg");
+  const mp3Opts = $("mp3Opts"), mp4Opts = $("mp4Opts"), scaleField = $("scaleField");
+  const bitrate = $("bitrate"), crf = $("crf"), scale = $("scale");
+  const convertBtn = $("convertBtn");
+  const progressWrap = $("progressWrap"), pbarFill = $("pbarFill"), statusText = $("statusText");
+  const result = $("result"), resultSub = $("resultSub"), downloadBtn = $("downloadBtn");
+  const logToggle = $("logToggle"), logEl = $("log");
+
+  // ---- State ----
+  let ffmpeg = null;
+  let loadingPromise = null;
+  let selectedFile = null;
+  let outputFormat = "mp3";
+  let resultUrl = null;
+  let busy = false;
+
+  // ---- Helpers ----
+  function fmtBytes(b) {
+    if (b === 0) return "0 B";
+    const u = ["B", "KB", "MB", "GB"];
+    const i = Math.floor(Math.log(b) / Math.log(1024));
+    return (b / Math.pow(1024, i)).toFixed(i === 0 ? 0 : 1) + " " + u[i];
+  }
+
+  function log(msg) {
+    logEl.textContent += msg + "\n";
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  function setStatus(text) { statusText.textContent = text; }
+
+  function setProgress(p) {
+    if (p === null) {
+      pbarFill.classList.add("indeterminate");
+      pbarFill.style.width = "";
+    } else {
+      pbarFill.classList.remove("indeterminate");
+      pbarFill.style.width = Math.max(0, Math.min(100, p * 100)) + "%";
+    }
+  }
+
+  function baseName(name) {
+    return name.replace(/\.[^/.]+$/, "") || "output";
+  }
+
+  function sanitize(name) {
+    return name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 80);
+  }
+
+  // ---- FFmpeg loading ----
+  async function getFFmpeg() {
+    if (ffmpeg) return ffmpeg;
+    if (loadingPromise) return loadingPromise;
+
+    loadingPromise = (async () => {
+      const inst = new FFmpeg();
+
+      inst.on("log", ({ message }) => {
+        log(message);
+        // Fallback progress parsing from ffmpeg's own time= output
+        const m = message.match(/time=(\d+):(\d+):(\d+\.\d+)/);
+        if (m && inst._durationSec) {
+          const t = (+m[1]) * 3600 + (+m[2]) * 60 + parseFloat(m[3]);
+          const p = t / inst._durationSec;
+          if (isFinite(p) && p >= 0) setProgress(p);
+        }
+      });
+
+      inst.on("progress", ({ progress }) => {
+        if (isFinite(progress) && progress >= 0) setProgress(progress);
+      });
+
+      setStatus("Downloading FFmpeg engine…");
+      setProgress(0.02);
+      log("[init] fetching core from " + CORE_BASE);
+
+      const [coreURL, wasmURL] = await Promise.all([
+        toBlobURL(`${CORE_BASE}/ffmpeg-core.js`, "text/javascript"),
+        toBlobURL(`${CORE_BASE}/ffmpeg-core.wasm`, "application/wasm"),
+      ]);
+
+      setStatus("Booting engine…");
+      setProgress(0.15);
+
+      await inst.load({ coreURL, wasmURL });
+
+      log("[init] engine ready");
+      setProgress(1);
+      setStatus("Engine ready");
+      ffmpeg = inst;
+      return inst;
+    })();
+
+    try {
+      return await loadingPromise;
+    } catch (e) {
+      loadingPromise = null;
+      throw e;
+    }
+  }
+
+  // ---- File selection ----
+  function pickFile(file) {
+    if (!file) return;
+    if (!file.type.startsWith("video/") && !file.type.startsWith("audio/")) {
+      const okExt = /\.(mp4|mov|mkv|webm|avi|m4v|flv|wmv|mp3|m4a|aac|wav|flac|ogg|opus)$/i;
+      if (!okExt.test(file.name)) {
+        alert("That doesn't look like a media file. Try MP4, MOV, MKV, WebM, M4A, WAV…");
+        return;
+      }
+    }
+
+    selectedFile = file;
+    fiName.textContent = file.name;
+    fiSize.textContent = fmtBytes(file.size);
+    fiIcon.textContent = file.type.startsWith("audio/") ? "🎵" : "🎬";
+    fileInfo.classList.add("show");
+    options.classList.add("show");
+    result.classList.remove("show");
+    resetProgress();
+    setStatus("Ready to convert");
+  }
+
+  function resetProgress() {
+    progressWrap.classList.remove("show");
+    pbarFill.classList.remove("indeterminate");
+    pbarFill.style.width = "0%";
+  }
+
+  function clearFile() {
+    selectedFile = null;
+    fileInput.value = "";
+    fileInfo.classList.remove("show");
+    options.classList.remove("show");
+    result.classList.remove("show");
+    resetProgress();
+    if (resultUrl) { URL.revokeObjectURL(resultUrl); resultUrl = null; }
+    setStatus("Ready");
+  }
+
+  // ---- Events: drop zone ----
+  drop.addEventListener("click", () => fileInput.click());
+  fileInput.addEventListener("change", (e) => pickFile(e.target.files[0]));
+  clearBtn.addEventListener("click", clearFile);
+
+  ["dragenter", "dragover"].forEach((ev) =>
+    drop.addEventListener(ev, (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      drop.classList.add("drag");
+    })
+  );
+  ["dragleave", "drop"].forEach((ev) =>
+    drop.addEventListener(ev, (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (ev === "dragleave" && drop.contains(e.relatedTarget)) return;
+      drop.classList.remove("drag");
+    })
+  );
+  drop.addEventListener("drop", (e) => {
+    const f = e.dataTransfer.files && e.dataTransfer.files[0];
+    pickFile(f);
+  });
+  window.addEventListener("dragover", (e) => e.preventDefault());
+  window.addEventListener("drop", (e) => e.preventDefault());
+
+  // ---- Events: format toggle ----
+  formatSeg.addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-fmt]");
+    if (!btn) return;
+    outputFormat = btn.dataset.fmt;
+    [...formatSeg.children].forEach((b) => b.classList.toggle("active", b === btn));
+    mp3Opts.style.display = outputFormat === "mp3" ? "" : "none";
+    mp4Opts.style.display = outputFormat === "mp4" ? "" : "none";
+    scaleField.style.display = outputFormat === "mp4" ? "" : "none";
+  });
+
+  // ---- Log toggle ----
+  logToggle.addEventListener("click", () => {
+    const open = logEl.classList.toggle("show");
+    logToggle.textContent = (open ? "▾ " : "▸ ") + "Show engine log";
+  });
+
+  // ---- Convert ----
+  convertBtn.addEventListener("click", async () => {
+    if (busy || !selectedFile) return;
+
+    busy = true;
+    convertBtn.disabled = true;
+    result.classList.remove("show");
+    if (resultUrl) { URL.revokeObjectURL(resultUrl); resultUrl = null; }
+
+    progressWrap.classList.add("show");
+    logEl.textContent = "";
+    logToggle.classList.add("show");
+    setProgress(null);
+    setStatus("Preparing…");
+
+    const inName = "input_" + sanitize(selectedFile.name).replace(/\.[^/.]+$/, "") +
+      (selectedFile.name.match(/\.[^/.]+$/) ? selectedFile.name.match(/\.[^/.]+$/)[0] : ".mp4");
+    const outName = outputFormat === "mp3" ? "output.mp3" : "output.mp4";
+    const outMime = outputFormat === "mp3" ? "audio/mpeg" : "video/mp4";
+
+    try {
+      const inst = await getFFmpeg();
+
+      setStatus("Writing file to engine…");
+      await inst.writeFile(inName, await fetchFile(selectedFile));
+
+      // Build args
+      let args;
+      if (outputFormat === "mp3") {
+        args = ["-i", inName, "-vn", "-c:a", "libmp3lame", "-b:a", bitrate.value, outName];
+      } else {
+        args = ["-i", inName, "-c:v", "libx264", "-preset", "veryfast", "-crf", crf.value];
+        if (scale.value) args.push("-vf", `scale=-2:${scale.value}`);
+        args.push("-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", outName);
+      }
+
+      log("[cmd] ffmpeg " + args.join(" "));
+      setProgress(null);
+      setStatus("Converting… (this can take a while)");
+
+      const code = await inst.exec(args);
+
+      if (code !== 0) {
+        throw new Error("FFmpeg exited with code " + code);
+      }
+
+      setStatus("Reading output…");
+      const data = await inst.readFile(outName);
+      const blob = new Blob([data.buffer ? data.buffer : data], { type: outMime });
+
+      // Cleanup virtual FS
+      try { await inst.deleteFile(inName); } catch (_) {}
+      try { await inst.deleteFile(outName); } catch (_) {}
+
+      resultUrl = URL.createObjectURL(blob);
+      downloadBtn.href = resultUrl;
+      downloadBtn.download = baseName(selectedFile.name) + "." + (outputFormat === "mp3" ? "mp3" : "mp4");
+
+      resultSub.textContent =
+        `${downloadBtn.download} — ${fmtBytes(blob.size)} ` +
+        `(from ${fmtBytes(selectedFile.size)}, ${Math.round(blob.size / selectedFile.size * 100)}%)`;
+
+      setProgress(1);
+      setStatus("Done");
+      result.classList.add("show");
+
+    } catch (err) {
+      console.error(err);
+      log("[error] " + (err && err.message ? err.message : String(err)));
+      setStatus("✗ " + (err && err.message ? err.message : "Conversion failed"));
+      pbarFill.classList.remove("indeterminate");
+      pbarFill.style.background = "var(--err)";
+      setTimeout(() => { pbarFill.style.background = ""; }, 2000);
+      logToggle.classList.add("show");
+    } finally {
+      busy = false;
+      convertBtn.disabled = false;
+    }
+  });
+
+  // Preload engine when the user shows intent (hover over drop zone)
+  drop.addEventListener("mouseenter", () => { getFFmpeg().catch(() => {}); }, { once: true });
+
+})();
+</script>
+</body>
+</html>
